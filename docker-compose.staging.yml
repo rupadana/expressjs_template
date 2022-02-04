@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  app-staging:
+    image: ${APP_IMAGE_STG}:${APP_IMAGE_STG_TAG}
+    container_name: api-whatsapp-staging
+    env_file: .env
+    
+    networks: 
+      - nginx
+    restart: always
+networks:
+  nginx:
+    external: true

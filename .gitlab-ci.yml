@@ -1,0 +1,122 @@
+stages:
+  - build
+  - test
+  - build-container
+  - deploy
+
+
+variables:
+  TAG_IMAGE: $CI_COMMIT_BRANCH-$CI_COMMIT_SHA
+  DOCKER_TLS_CERTDIR: ''
+  MYSQL_DATABASE: mark1
+  MYSQL_ROOT_PASSWORD: admin
+  NODE_ENV: test
+  DB_HOST_TEST: mysql
+  DB_PORT_TEST: 3306
+  DB_USER_TEST: root
+  DB_PASS_TEST: admin
+  DB_NAME_TEST: mark1
+  APP_PORT: 8004
+
+
+
+build-app:
+  image: node:alpine
+  stage: build
+  cache: 
+    key: "$CI_COMMIT_REF_SLUG"
+    paths: 
+      - node_modules/
+  script:
+    - npm install
+  artifacts:
+    untracked: true
+  only:
+    changes:
+      - "*.js"
+      - "**/*.js"
+
+run-test:
+  image: node:alpine
+  stage: test
+  services:
+    - mysql:latest
+  script:
+    - npm run test
+  artifacts:
+    untracked: true
+  only:
+    changes:
+      - "*.js"
+      - "**/*.js"
+
+docker-build:
+  image: docker:latest
+  stage: build-container
+  cache: 
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - node_modules/
+    policy: pull
+  dependencies: 
+    - build-app
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:latest" -t "$CI_REGISTRY_IMAGE:$TAG_IMAGE" .
+    - docker push "$CI_REGISTRY_IMAGE" --all-tags
+  only:
+    changes:
+      - "*.js"
+      - "**/*.js"
+
+deploy-staging:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: staging
+  before_script:
+    - 'which ssh-agent || ( apk update && apk add --no-cache openssh )'
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 700 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  script:
+    - ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_STAGING} -p 1022 "export APP_IMAGE_STG=$CI_REGISTRY_IMAGE && export APP_IMAGE_STG_TAG=$TAG_IMAGE && docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && cd $SSH_PATH_STG && git pull && docker-compose -f docker-compose.staging.yml down && docker-compose -f docker-compose.staging.yml pull && docker-compose -f docker-compose.staging.yml up -d"
+  only:
+    refs: 
+      - staging
+    changes:
+      - "*.js"
+      - "**/*.js"
+
+    
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - 'which ssh-agent || ( apk update && apk add --no-cache openssh )'
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 700 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  script:
+    - ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_PRODUCTION} -p 1022 "export APP_IMAGE_PROD=$CI_REGISTRY_IMAGE && export APP_IMAGE_PROD_TAG=$TAG_IMAGE && docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && cd $SSH_PATH_PROD && git pull && docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml pull && docker-compose -f docker-compose.prod.yml up -d"
+  environment:
+    name: production
+  when: manual
+  only:
+    refs:
+      - main
+    changes:
+      - "*.js"
+      - "**/*.js"
+    
+  

@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  app-production:
+    image: ${APP_IMAGE_PROD}:${APP_IMAGE_PROD_TAG}
+    container_name: mark1-prod
+    env_file: .env
+    networks: 
+      - nginx
+    restart: always
+    ports: 
+      - "8004:8004"
+networks:
+  nginx:
+    external: true

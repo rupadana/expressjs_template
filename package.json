@@ -1,0 +1,46 @@
+{
+  "name": "mark1-be",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "migrate": "npx sequelize-cli db:migrate",
+    "create-model": "npx sequelize-cli model:generate --name Verification --attributes code:string,token:string,verified:tinyint,expiredAt:date,user_id:integer",
+    "test": "cross-env NODE_ENV=test npm run pretest && jest --testTimeout=20000 --runInBand --detectOpenHandles --forceExit",
+    "pretest": "cross-env NODE_ENV=test npm run migrate:reset",
+    "migrate:reset": "npx sequelize-cli db:migrate:undo:all && npm run migrate"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  },
+  "author": "Rupadana",
+  "license": "ISC",
+  "dependencies": {
+    "@sentry/node": "^6.16.1",
+    "@sentry/tracing": "^6.16.1",
+    "bcrypt": "^5.0.1",
+    "body-parser": "^1.19.1",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.2",
+    "express-validator": "^6.14.0",
+    "jsonwebtoken": "^8.5.1",
+    "method-override": "^3.0.0",
+    "minio": "^7.0.25",
+    "multer": "^1.4.4",
+    "mysql2": "^2.3.3",
+    "node-fetch": "^2.6.6",
+    "sequelize": "^6.12.5"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "jest": "^27.4.7",
+    "sequelize-cli": "^6.3.0",
+    "supertest": "^6.2.0"
+  }
+}
